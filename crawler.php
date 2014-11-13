@@ -15,7 +15,7 @@
 		private $_emailPattern = '#[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}#U';
 		private $_phonePattern = '#(0[1-9][-.\s]?(\d{2}[-.\s]?){3}\d{2})#';
 		private $_jobPattern = '/<div id="headline" class="editable-item">(.*?)<\/div>/si';
-		private $_linkPattern = '#href=".+"#U';
+		private $_linkPattern = '#<a href="([^"]*)">[^<]*</a>#U';
 		private $_googleLinkPattern = '/<h3 class="r"><a href="(.*?)"/si';
 
 		private $_uselessLinks = array(
@@ -53,6 +53,7 @@
 				$tmp_file = $this->getOrCreateFile($this->_tmpLinkPath);
 
 				file_put_contents($this->_tmpLinkPath, file_get_contents($this->_linkPath));
+				file_put_contents($this->_linkPath, '');
 						
 				// on créé une boucle pour visiter chacun des liens
 				// on stop cette boucle quand le curseur arrive à la fin du fichier
@@ -93,11 +94,9 @@
 		        $fp_fichier_html_brut = $this->getOrCreateFile($this->_htmlPath);
 		        
 		        // définition des paramètres curl
-		        // 1 redirection de l'output dans le fichier txt
 		        curl_setopt($ch, CURLOPT_FILE, $fp_fichier_html_brut);
 		        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
 		        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
-		        // 2 on spécifie d'ignorer les headers HTTP
 		        curl_setopt($ch, CURLOPT_HEADER, 0);
 		        
 		        // exécution de curl
@@ -120,12 +119,10 @@
 	        // passage du contenu du fichier à une variable pour analyse
     		$html_brut = file_get_contents($this->_htmlPath);
 
+    		
 	        $this->crawl_emails($html_brut);
-        
 	        $this->crawl_links($html_brut);
-
 	        $this->crawl_phones($html_brut);
-
 	        $this->crawl_jobs($html_brut);
 		}
 
@@ -136,10 +133,15 @@
 			else
 	        	preg_match_all($this->_linkPattern, $html_brut, $liens_extraits);
 
+	        if(!$this->_isGoogle)
+		        $liens_extraits = $liens_extraits[1];
+		    else
+    			$liens_extraits = $liens_extraits[0];
+
 	        $fp_fichier_liens = $this->getOrCreateFile($this->_linkPath, false);
 
 			// on créé une boucle pour enregistrer tous les liens ds le fichier
-            foreach ($liens_extraits[0] as $element) {		
+            foreach ($liens_extraits as $element) {		
             	// on recharge le contenu dans la variable à chaque tour de boucle
             	// pour être à jour si le lien est present +sieurs x sur la même page
             	$gestion_doublons = file_get_contents($this->_linkPath);
@@ -151,8 +153,8 @@
 	                $element = preg_replace('#&amp;sa=.+#', '', $element);
 	            }
 	            else {
-	            	$element = preg_replace('#href=".+"#', '', $element);
-	                $element = preg_replace('#"#', '', $element);
+	            	//$element = preg_replace('#href=".+"#', '', $element);
+	                //$element = preg_replace('#"#', '', $element);
 	            }
                 $follow_url = $element;
                 $follow_url .= "\r\n";
