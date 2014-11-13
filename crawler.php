@@ -17,28 +17,13 @@
 		private $_jobPattern = '/<div id="headline" class="editable-item">(.*?)<\/div>/si';
 		private $_linkPattern = '#<a href="([^"]*)">[^<]*</a>#U';
 		private $_googleLinkPattern = '/<h3 class="r"><a href="(.*?)"/si';
-
-		private $_uselessLinks = array(
-			'',
-			'#',
-			'/search?', 
-			'/intl/fr/about.html', 
-			'/intl/fr/policies/', 
-			'/preferences?hl=fr', 
-			'http://www.google.fr/history/optout?hl=fr', 
-			'/search?site=&amp;ie=UTF-8&amp;q=Phila%C3%A9+atterrisseur&amp;oi=ddle&amp;ct=philae-robotic-lander-lands-on-comet-67pchuryumovgerasimenko-5668009628663808-hp&amp;hl=fr',
-			'/advanced_search?hl=fr&amp;authuser=0',
-			'/language_tools?hl=fr&amp;authuser=0',
-			'/intl/fr/ads/',
-			'/services/',
-			'https://www.google.fr/setprefdomain?prefdom=US&amp;sig=0_m-wd5ZG_N6uYXKRWjI1fGf8eyHM%3D'
-		);
 		
-		public function __construct($url = "", $depth = 1) {
+		public function __construct($url = "", $depth = 1, array $config) {
 			if(!empty($url))
 				$this->_url = $url;
 
 			$this->_depth = $depth;
+			$this->_config = $config;
 		}
 
 		public function run(){
@@ -58,25 +43,26 @@
 				// on créé une boucle pour visiter chacun des liens
 				// on stop cette boucle quand le curseur arrive à la fin du fichier
 				$numero_de_ligne = 1;
-
 				while(!feof($tmp_file)) {
 				    // curl ne comprend que les liens absolus
 				    // on formate donc nos liens relatifs en liens absolus
 				    $url = fgets($tmp_file);
 				    $page_suivante = '';
 
-				    if(!in_array($url, $this->_uselessLinks)){
-					    if($this->str_ends_with($url, '/'))
-					    	substr($url, 0, strlen($url) - 1);
-					    if(!$this->str_starts_with($url, 'http://') && !$this->str_starts_with($url, 'https://'))
-					    	$page_suivante = $this->_url;
-					    $page_suivante .= $url;
+				    if($this->str_ends_with($url, '/'))
+				    	substr($url, 0, strlen($url) - 1);
+				    if(!$this->str_starts_with($url, 'http://') && !$this->str_starts_with($url, 'https://'))
+				    	$page_suivante = $this->_url;
+				    
+				    $page_suivante .= $url;
+				    $page_suivante = trim($page_suivante);
+				    if($this->isAvoidUrl($page_suivante, $this->recognitionWebsite($page_suivante))){
 
 					    echo $numero_de_ligne . ' Analyse en cours, page : ' .  $page_suivante . '<br/>';
 					    $numero_de_ligne++;
 					          
 					    //on se contente de rappeler la fonction crawl avec nos nouveaux liens
-					    $this->crawl(trim($page_suivante));
+					    $this->crawl($page_suivante);
 					}
 				}
 				fclose ($tmp_file);
@@ -246,5 +232,30 @@
 	        $file = fopen($path, 'a+');
 
 	        return $file;
+		}
+
+		private function recognitionWebsite($url) {
+			foreach ($this->_config['known_websites'] as $key => $value) {
+				if($value($url)) {
+					return $key;
+				}
+			}
+			return false;
+		}
+
+		private function isAvoidUrl($url, $website) {
+			$urlsAvoid = array();
+			if($website && array_key_exists($website, $this->_config['void_links'])) {
+				$urlsAvoid = array_merge($this->_config['void_links'][$website], $this->_config['void_links']['default']);
+			} else {
+				$urlsAvoid = $this->_config['void_links']['default'];
+			}
+
+			foreach ($urlsAvoid as $urlAvoid) {
+				if(strpos($url, $urlAvoid)) {
+					return false;
+				}
+			}
+			return true;
 		}
 	}
