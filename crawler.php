@@ -8,11 +8,13 @@
 		private $_htmlPath = 'crawled_content/fichier_html';
 		private $_emailPath = 'crawled_content/fichier_email';
 		private $_phonePath = 'crawled_content/fichier_telephone';
+		private $_jobPath = 'crawled_content/fichier_job';
 		private $_linkPath = 'crawled_content/fichier_lien';
 		private $_tmpLinkPath = 'crawled_content/tmp_fichier_lien';
 
-		private $_emailPattern = '#^[[:alnum:]]([-_.]?[[:alnum:]])+_?@[[:alnum:]]([-.]?[[:alnum:]])+\.[a-z]{2,6}$#U';
-		private $_phonePattern = '#^(0[1-68][-.\s]?(\d{2}[-.\s]?){3}\d{2})$#';
+		private $_emailPattern = '#[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}#U';
+		private $_phonePattern = '#(0[1-9][-.\s]?(\d{2}[-.\s]?){3}\d{2})#';
+		private $_jobPattern = '/<div id="headline" class="editable-item">(.*?)<\/div>/si';
 		private $_linkPattern = '#href=".+"#U';
 		private $_googleLinkPattern = '/<h3 class="r"><a href="(.*?)"/si';
 
@@ -71,9 +73,9 @@
 
 					    echo $numero_de_ligne . ' Analyse en cours, page : ' .  $page_suivante . '<br/>';
 					    $numero_de_ligne++;
-					                
+					          
 					    //on se contente de rappeler la fonction crawl avec nos nouveaux liens
-					    $this->crawl($page_suivante);
+					    $this->crawl(trim($page_suivante));
 					}
 				}
 				fclose ($tmp_file);
@@ -94,6 +96,7 @@
 		        // 1 redirection de l'output dans le fichier txt
 		        curl_setopt($ch, CURLOPT_FILE, $fp_fichier_html_brut);
 		        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+		        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0');
 		        // 2 on spécifie d'ignorer les headers HTTP
 		        curl_setopt($ch, CURLOPT_HEADER, 0);
 		        
@@ -122,6 +125,8 @@
 	        $this->crawl_links($html_brut);
 
 	        $this->crawl_phones($html_brut);
+
+	        $this->crawl_jobs($html_brut);
 		}
 
 		private function crawl_links($html_brut){
@@ -141,7 +146,8 @@
             		
             	// on enlève les "" qui entourent les liens
             	if($this->_isGoogle){
-	                $element = preg_replace('#<h3 class="r"><a href="/url\?q=#', '', $element);
+	                $element = preg_replace('#<h3 class="r"><a href="#', '', $element);
+	                $element = preg_replace('#/url\?q=#', '', $element);
 	                $element = preg_replace('#&amp;sa=.+#', '', $element);
 	            }
 	            else {
@@ -197,6 +203,24 @@
 	        // on creer une boucle pour placer tous les mails de la page dans le fichier
 	        foreach ($tels[0] as $element) {				
 				// on ajoute un retour chariot en fin de ligne pour avoir 1 mail/ligne
+				$element .= "\r\n";
+	        	fputs($fp_fichier_phones, $element);
+	        }
+        
+        	fclose($fp_fichier_phones);
+		}
+
+		private function crawl_jobs($html_brut){
+			// extraction des emails
+			preg_match_all($this->_jobPattern, $html_brut, $tels);
+        
+	        // creation d'un fichier pour recevoir les mails
+	        $fp_fichier_phones = $this->getOrCreateFile($this->_jobPath, false);
+        
+	        // on creer une boucle pour placer tous les mails de la page dans le fichier
+	        foreach ($tels[0] as $element) {				
+				// on ajoute un retour chariot en fin de ligne pour avoir 1 mail/ligne
+				$element = strip_tags($element);
 				$element .= "\r\n";
 	        	fputs($fp_fichier_phones, $element);
 	        }

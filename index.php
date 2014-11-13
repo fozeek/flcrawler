@@ -3,7 +3,11 @@
 			
 	require 'crawler.php';
 
-	$Crawler = new Crawler('https://www.google.fr/search?hl=fr&q=ludovic+nitoumbi&start=1', 1);
+	$firstname = "thibault";
+	$lastname = "dulon";
+	$url = 'https://www.google.fr/search?hl=fr&q=' . $firstname . '+' . $lastname . '&oq=' . $firstname;
+
+	$Crawler = new Crawler($url, 1);
 
 	$Crawler->run();
 ?>
